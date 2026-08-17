@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ ticker }} — BIST Takip{% endblock %}
+{% block content %}
+  <p><a href="{{ url_for('index') }}">&larr; Panel</a></p>
+  <h1>{{ ticker }}</h1>
+
+  {% if not data %}
+    <p class="muted">Bu hisse için henüz veri yok.</p>
+  {% else %}
+    <p class="muted">Son güncelleme: {{ updated_at }}</p>
+
+    <section class="block">
+      <h2>Fiyat</h2>
+      <p>
+        <strong>{{ data.snapshot.last_close }} TL</strong>
+        <span class="pct {{ 'up' if data.snapshot.change_pct > 0 else ('down' if data.snapshot.change_pct < 0 else '') }}">
+          ({{ "%+.2f"|format(data.snapshot.change) }} / {{ "%+.2f"|format(data.snapshot.change_pct) }}%)
+        </span>
+        — {{ data.snapshot.date }}
+      </p>
+      <p class="muted">Hacim: {{ "{:,}".format(data.snapshot.volume) }}</p>
+    </section>
+
+    <section class="block">
+      <h2>Teknik Göstergeler</h2>
+      <ul>
+        <li>RSI ({{ data.indicators.rsi }}): {{ data.indicators.rsi_note }}</li>
+        <li>MACD ({{ data.indicators.macd }} / sinyal {{ data.indicators.macd_signal }}): {{ data.indicators.macd_note }}</li>
+        <li>SMA20 ({{ data.indicators.sma_short }}) vs SMA50 ({{ data.indicators.sma_long }}): {{ data.indicators.trend_note }}</li>
+      </ul>
+    </section>
+
+    <section class="block">
+      <h2>Geçmiş İstatistik (RSI Aşırı Satım Sonrası, 5 gün)</h2>
+      {% if data.backtest.sample_size > 0 %}
+        <ul>
+          <li>Geçmişte {{ data.backtest.sample_size }} kez bu koşul oluşmuş.</li>
+          <li>5 gün sonra ortalama getiri: %{{ data.backtest.avg_return_pct }}</li>
+          <li>Pozitif kapanan durum oranı: %{{ data.backtest.win_rate }}</li>
+        </ul>
+        <p class="muted small">Küçük örneklem boyutları istatistiksel olarak güvenilir olmayabilir.</p>
+      {% else %}
+        <p class="muted">Son dönemde bu koşul (RSI ≤ 30) hiç oluşmamış.</p>
+      {% endif %}
+    </section>
+
+    <section class="block">
+      <h2>Haber Duyarlılığı ({{ data.sentiment.count }} haber tarandı)</h2>
+      <p>{{ data.sentiment.label }} (skor: {{ data.sentiment.average_score }})</p>
+      <ul class="news-list">
+        {% for item in data.news %}
+          <li>
+            <span class="{{ 'up' if item.score > 0 else ('down' if item.score < 0 else '') }}">&#9679;</span>
+            <a href="{{ item.link }}" target="_blank" rel="noopener">{{ item.title }}</a>
+            <span class="muted small">{{ item.published }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Panel — BIST Takip{% endblock %}
+{% block content %}
+  <h1>Panel</h1>
+  {% if updated_at %}
+    <p class="muted">Son güncelleme: {{ updated_at }}</p>
+  {% else %}
+    <p class="muted">Henüz veri yok. İlk analiz çalıştığında burada görünecek.</p>
+  {% endif %}
+
+  <div class="card-grid">
+    {% for ticker in tickers %}
+      {% set data = tickers_data.get(ticker) %}
+      <a class="card" href="{{ url_for('ticker_detail', ticker=ticker) }}">
+        <div class="card-head">
+          <span class="ticker">{{ ticker }}</span>
+          {% if data %}
+            {% set chg = data.snapshot.change_pct %}
+            <span class="pct {{ 'up' if chg > 0 else ('down' if chg < 0 else '') }}">
+              {{ "%+.2f"|format(chg) }}%
+            </span>
+          {% endif %}
+        </div>
+        {% if data %}
+          <div class="price">{{ data.snapshot.last_close }} TL</div>
+          <div class="badges">
+            <span class="badge">RSI {{ data.indicators.rsi }}</span>
+            <span class="badge">{{ data.sentiment.label }}</span>
+          </div>
+          <div class="muted small">{{ data.indicators.trend_note }}</div>
+        {% else %}
+          <div class="muted">Veri yok</div>
+        {% endif %}
+      </a>
+    {% endfor %}
+  </div>
+{% endblock %}

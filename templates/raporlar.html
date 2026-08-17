@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Raporlar — BIST Takip{% endblock %}
+{% block content %}
+  <h1>Geçmiş Raporlar</h1>
+  {% if not files %}
+    <p class="muted">Henüz rapor yok.</p>
+  {% else %}
+    <ul class="report-list">
+      {% for f in files %}
+        <li><a href="{{ url_for('rapor_detail', filename=f) }}">{{ f }}</a></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endblock %}

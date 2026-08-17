@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ filename }} — BIST Takip{% endblock %}
+{% block content %}
+  <p><a href="{{ url_for('raporlar_list') }}">&larr; Raporlar</a></p>
+  <article class="rapor">
+    {{ content | safe }}
+  </article>
+{% endblock %}
