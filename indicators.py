@@ -8,16 +8,49 @@ import pandas as pd
 from config import RSI_PERIOD, SMA_SHORT, SMA_LONG, MACD_FAST, MACD_SLOW, MACD_SIGNAL
 
 
+def _wilder_average(series: pd.Series, period: int) -> pd.Series:
+    """
+    Wilder yumuşatması: tohum değer ilk `period` gözlemin düz ortalamasıdır,
+    sonraki her değer `(önceki * (period-1) + yeni) / period` ile ilerler.
+
+    `ewm(alpha=1/period, adjust=False)` tek başına yeterli DEĞİL: o, serinin
+    ilk değerinden tohumlar ve kısa serilerde Wilder'dan 6-11 puan sapar.
+    Tohumu period'uncu konuma yazıp öncesini NaN bırakınca `ignore_na=True`
+    ile özyineleme doğru noktadan başlar.
+    """
+    out = series.astype(float).copy()
+    out.iloc[:period] = float("nan")
+    out.iloc[period] = series.iloc[1:period + 1].mean()
+    return out.ewm(alpha=1 / period, adjust=False, ignore_na=True).mean()
+
+
 def compute_rsi(close: pd.Series, period: int = RSI_PERIOD) -> pd.Series:
+    """
+    Wilder yumuşatmasıyla standart RSI.
+
+    Önceden `rolling(period).mean()` (düz hareketli ortalama) kullanılıyordu.
+    Bu, Wilder'ın 1978'de tanımladığı ve TradingView/Investing dahil yaygın
+    platformların uyguladığı RSI DEĞİLDİR: düz ortalama, pencereden çıkan günü
+    tamamen atıp yapay sıçramalar üretir; Wilder ise geçmişi 1/period
+    ağırlığıyla üstel olarak söndürür. İki yöntem aynı hisse için gözle
+    görülür farklı değerler verdiğinden, panelde gösterilen RSI kullanıcının
+    başka bir yerde gördüğüyle uyuşmuyordu.
+    """
+    # Tohum için `period`+1 kapanış gerekir (ilk fark NaN olduğundan).
+    if len(close) <= period:
+        return pd.Series(float("nan"), index=close.index)
+
     delta = close.diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
+    avg_gain = _wilder_average(delta.clip(lower=0), period)
+    avg_loss = _wilder_average(-delta.clip(upper=0), period)
 
-    avg_gain = gain.rolling(window=period).mean()
-    avg_loss = loss.rolling(window=period).mean()
+    rsi = 100 - (100 / (1 + avg_gain / avg_loss))
 
-    rs = avg_gain / avg_loss.replace(0, 1e-10)
-    rsi = 100 - (100 / (1 + rs))
+    # Sınır durumları: avg_loss sıfırsa bölme inf/NaN üretir. Hiç düşüş yoksa
+    # RSI 100; ne düşüş ne yükseliş varsa (yatay fiyat) konvansiyon 50'dir.
+    # Isınma periyodundaki NaN'lar etkilenmez (NaN karşılaştırmaları False).
+    rsi = rsi.mask((avg_loss == 0) & (avg_gain > 0), 100.0)
+    rsi = rsi.mask((avg_loss == 0) & (avg_gain == 0), 50.0)
     return rsi
 
 

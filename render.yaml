@@ -7,8 +7,13 @@ services:
     # --timeout 120: bazı yfinance çağrıları gunicorn'un 30s varsayılanını
     # aşabiliyor. Tam günlük analiz artık arka plan thread'inde çalışıyor
     # (bkz. app.api_refresh), bu yüzden daha uzun bir timeout'a gerek yok.
-    startCommand: gunicorn app:app --timeout 120
+    # --workers 1: zamanlayıcı her worker'da ayrı ayrı çalışır; birden fazla
+    # worker'da her yenileme tekrarlanır (bkz. app._scheduler_enabled_on_import).
+    startCommand: gunicorn app:app --timeout 120 --workers 1
     envVars:
+      # Arka plan fiyat yenilemesini production'da da çalıştırır.
+      - key: ENABLE_PRICE_SCHEDULER
+        value: "1"
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: TELEGRAM_CHAT_ID

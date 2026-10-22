@@ -60,9 +60,14 @@ kişi kayıt olabilir, **her kullanıcının kendi hisse takip listesi** vardır
 sıfırlama yoktur; e-posta sadece profil bilgisi olarak saklanır. Kullanıcı
 bilgileri lokal `users.db` (SQLite) dosyasında tutulur.
 
-`python app.py` çalıştığı sürece (uygulama açık kaldığı sürece), fiyat/gösterge/
-istatistiksel aralık verisi arka planda her `PRICE_REFRESH_MINUTES` (varsayılan
-5) dakikada bir otomatik tazelenir — bu hafif yenileme haberleri tekrar
+Uygulama açık kaldığı sürece fiyat/gösterge/istatistiksel aralık verisi arka
+planda her `PRICE_REFRESH_MINUTES` (varsayılan 5) dakikada bir otomatik
+tazelenir. Bu zamanlayıcı `python app.py` ile lokalde her zaman çalışır;
+gunicorn altında (Render) `ENABLE_PRICE_SCHEDULER=1` ile açılır — `render.yaml`
+bunu zaten set ediyor. Zamanlayıcı her worker'da ayrı çalıştığı için
+`startCommand` içinde `--workers 1` sabittir; ölçeklerseniz her yenileme worker
+sayısı kadar tekrarlanır. Render free plan'da servis 15 dakika boşta kalınca
+uyuduğu için yenileme yalnızca servis ayakken ilerler. Bu hafif yenileme — bu hafif yenileme haberleri tekrar
 taramaz, AI yorumunu tekrar üretmez, Telegram'a mesaj göndermez (sadece daha
 önce `main.py`/`/api/refresh` ile tam analiz çalışmış hisseleri günceller).
 Haber + AI yorumu + Telegram raporu içeren tam günlük analiz ayrı ve bağımsız
@@ -74,7 +79,8 @@ Haber + AI yorumu + Telegram raporu içeren tam günlük analiz ayrı ve bağım
 2. [render.com](https://render.com)'da hesap aç, "New +" → "Blueprint" ile bu
    repoyu bağla (`render.yaml` ayarları otomatik okur, free plan).
 3. Render dashboard'ında servisin "Environment" sekmesinden şu değişkenleri
-   gir: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET`,
+   gir (`ENABLE_PRICE_SCHEDULER=1` zaten `render.yaml`'da tanımlı):
+   `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRET`,
    `REFRESH_TOKEN`, `SECRET_KEY` (oturum çerezlerini imzalamak için —
    girilmezse otomatik üretilip yerel bir dosyada saklanır, ama Render'ın
    diski kalıcı olmadığından her restart'ta oturumlar düşer; production'da
@@ -127,6 +133,16 @@ worker timeout'una takılıyordu). Analiz hâlâ sürüyorsa `409 {"status":
 ```bash
 curl -H "Authorization: Bearer <REFRESH_TOKEN>" https://<url>/api/refresh/status
 ```
+
+## Teknik Göstergeler Hakkında Not
+
+RSI, **Wilder yumuşatmasıyla** hesaplanır (`alpha = 1/14`, tohum ilk 14 günün
+düz ortalaması) — yani TradingView, Investing ve diğer yaygın platformlarla
+aynı değerleri üretir. Daha önce düz hareketli ortalama kullanılıyordu; o
+yöntem standart RSI değildir ve aynı hisse için ortalama ~5-6 puan (uçlarda
+17 puana kadar) farklı değer veriyordu. Bu düzeltme `backtest.py`'nin
+"RSI ≤ 30" örneklemini de değiştirir — eski raporlardaki RSI değerleri ve
+backtest sayıları yenileriyle doğrudan karşılaştırılamaz.
 
 ## İstatistiksel Aralık ve AI Yorumu
 

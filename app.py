@@ -442,15 +442,44 @@ def _run_price_refresh():
         print(f"Fiyat yenileme sırasında hata: {e}")
 
 
+# Zamanlayıcı yalnızca bir kez başlatılmalı; hem __main__ hem de içe aktarma
+# yolundan çağrılabildiği için koruma gerekiyor.
+_scheduler = None
+
+
 def start_price_scheduler():
-    scheduler = BackgroundScheduler(daemon=True)
-    scheduler.add_job(
+    global _scheduler
+    if _scheduler is not None:
+        return _scheduler
+
+    _scheduler = BackgroundScheduler(daemon=True)
+    _scheduler.add_job(
         _run_price_refresh, "interval",
         minutes=PRICE_REFRESH_MINUTES, id="price_refresh",
         next_run_time=datetime.now(),  # sunucu açılır açılmaz bir kez hemen çalışsın
     )
-    scheduler.start()
+    _scheduler.start()
     print(f"Fiyat yenileme zamanlayıcısı başladı ({PRICE_REFRESH_MINUTES} dakikada bir).")
+    return _scheduler
+
+
+# Zamanlayıcı önceden SADECE `if __name__ == "__main__"` bloğunda
+# başlatılıyordu; gunicorn bu dosyayı içe aktardığı için production'da hiç
+# çalışmıyordu (Render'daki kullanıcılar yalnızca günlük veriyi görüyordu).
+# Artık ENABLE_PRICE_SCHEDULER=1 ile içe aktarma sırasında da başlar.
+#
+# Neden otomatik değil de ortam değişkeniyle:
+#   - Her gunicorn worker'ı kendi zamanlayıcısını başlatır. Tek worker
+#     varsayılanında sorun yok, ama ölçeklerseniz her yenileme worker sayısı
+#     kadar tekrar çalışır — bu yüzden startCommand'da --workers 1 sabit.
+#   - CI ve test `import app` yapıyor; otomatik başlasa her içe aktarma
+#     ağ isteği atardı.
+def _scheduler_enabled_on_import() -> bool:
+    return os.getenv("ENABLE_PRICE_SCHEDULER", "").lower() in ("1", "true", "yes")
+
+
+if _scheduler_enabled_on_import():
+    start_price_scheduler()
 
 
 if __name__ == "__main__":

@@ -6,6 +6,47 @@ rapor dosyasında birleştirir.
 
 import os
 from datetime import datetime
+from urllib.parse import urlparse
+
+# Raporun bir kısmı DIŞ KAYNAKLI: haber başlıkları/linkleri Google News
+# RSS'inden geliyor, AI yorumları ise model çıktısı. Rapor, web panelinde
+# Markdown'dan HTML'e çevrilip `{{ content | safe }}` ile basılıyor ve
+# Python-Markdown ham HTML'i olduğu gibi geçiriyor — yani bir haber
+# başlığındaki <script> etiketi panelde ÇALIŞIRDI (depolanmış XSS).
+# Aşağıdaki iki yardımcı, dış kaynaklı veriyi rapora gömmeden önce
+# etkisizleştirir.
+#
+# `&` kasıtlı olarak escape EDİLMEZ: rapor aynı zamanda Telegram'a düz metin
+# olarak gönderiliyor ve haber başlıklarında `&` sık geçtiği için orada
+# "&amp;" gibi görünürdü. Etiket açmak için `<` gerekli olduğundan `<` ve `>`
+# etkisizleştirmek XSS'i kapatmaya yeter.
+_ALLOWED_URL_SCHEMES = ("http", "https")
+
+
+def safe_text(value) -> str:
+    """Dış kaynaklı metni rapora gömmek için etkisizleştirir."""
+    text = str(value if value is not None else "")
+    text = text.replace("<", "&lt;").replace(">", "&gt;")
+    # Markdown link sözdizimini ([başlık](url)) bozacak köşeli parantezler
+    return text.replace("[", r"\[").replace("]", r"\]")
+
+
+def safe_url(value):
+    """
+    Sadece http/https linkleri döndürür; `javascript:` gibi şemalar None olur
+    (Python-Markdown link hedeflerini doğrulamaz, `[x](javascript:...)` çalışır).
+    """
+    raw = str(value if value is not None else "").strip()
+    if not raw:
+        return None
+    try:
+        scheme = urlparse(raw).scheme.lower()
+    except ValueError:
+        return None
+    if scheme not in _ALLOWED_URL_SCHEMES:
+        return None
+    # Parantezler markdown link hedefini erken kapatır
+    return raw.replace("(", "%28").replace(")", "%29")
 
 
 def build_volatility_section(vol: dict) -> str:
@@ -82,7 +123,7 @@ def build_chart_readings_section(chart_readings: dict) -> str:
     for key, label in labels.items():
         reading = chart_readings.get(key)
         if reading:
-            lines.append(f"**{label}:** {reading}")
+            lines.append(f"**{label}:** {safe_text(reading)}")
             lines.append("")
     lines.append(
         "*(Bu okumalar, ilgili grafik yapay zeka ile görsel olarak "
@@ -127,7 +168,7 @@ def build_ipo_signal_section(ipo: dict) -> str:
 
     if ipo.get("ai_assessment"):
         lines.append("")
-        lines.append(f"**AI Değerlendirmesi (spekülatif):** {ipo['ai_assessment']}")
+        lines.append(f"**AI Değerlendirmesi (spekülatif):** {safe_text(ipo['ai_assessment'])}")
 
     lines.append(
         "- *(Not: Bu, GELECEK TAHMİNİ değildir — 'kaç tavan daha yapar' ya da "
@@ -193,7 +234,7 @@ def build_ticker_section(ticker: str, snapshot: dict, ind: dict,
 
     if ai_comment:
         lines.append("### AI Yorumu (Veri Sentezi)")
-        lines.append(ai_comment)
+        lines.append(safe_text(ai_comment))
         lines.append("")
         lines.append(
             "*(Bu paragraf yukarıdaki veriler temel alınarak yapay zeka ile "
@@ -215,7 +256,14 @@ def build_ticker_section(ticker: str, snapshot: dict, ind: dict,
         lines.append("**Son haberler:**")
         for item in news_items[:5]:
             tag = "🟢" if item["score"] > 0 else ("🔴" if item["score"] < 0 else "⚪")
-            lines.append(f"- {tag} [{item['title']}]({item['link']}) — {item['published']}")
+            title = safe_text(item.get("title"))
+            published = safe_text(item.get("published"))
+            url = safe_url(item.get("link"))
+            if url:
+                lines.append(f"- {tag} [{title}]({url}) — {published}")
+            else:
+                # Link güvenli değil/yok — başlığı linksiz göster, atlama.
+                lines.append(f"- {tag} {title} — {published}")
     lines.append("")
     lines.append("---")
     lines.append("")
