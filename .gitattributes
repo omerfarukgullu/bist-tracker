@@ -1,0 +1,8 @@
+# Depoda tüm metin dosyaları LF ile saklanır; Windows'ta çalışma kopyasına
+# otomatik dönüştürülür. Bu olmadan Windows/Linux arasında tüm dosya
+# "değişmiş" gibi görünüyor ve diff'ler okunamaz hale geliyor.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary

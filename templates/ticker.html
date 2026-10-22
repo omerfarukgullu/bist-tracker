@@ -1,61 +1,290 @@
 {% extends "base.html" %}
-{% block title %}{{ ticker }} — BIST Takip{% endblock %}
+{% block title %}{{ ticker }} — BIST Tracker{% endblock %}
 {% block content %}
-  <p><a href="{{ url_for('index') }}">&larr; Panel</a></p>
+  <p><a href="{{ url_for('index') }}">&larr; {{ t('back_to_panel') }}</a></p>
   <h1>{{ ticker }}</h1>
 
   {% if not data %}
-    <p class="muted">Bu hisse için henüz veri yok.</p>
+    <p class="muted">{{ t('no_ticker_data') }}</p>
   {% else %}
-    <p class="muted">Son güncelleme: {{ updated_at }}</p>
+    {% set chg = data.snapshot.change_pct %}
+    <div class="ticker-hero">
+      <span class="hero-price">{{ data.snapshot.last_close }} TL</span>
+      <span class="pct-pill {{ 'up' if chg > 0 else ('down' if chg < 0 else 'flat') }}">
+        {{ '▲' if chg > 0 else ('▼' if chg < 0 else '—') }}
+        {{ "%+.2f"|format(data.snapshot.change) }} / {{ "%+.2f"|format(chg) }}%
+      </span>
+      <span class="muted small">{{ data.snapshot.date }}</span>
+    </div>
+    <p class="muted small">{{ t('last_updated') }}: {{ updated_at }}</p>
 
+    <div class="stat-grid">
+      <div class="stat-tile">
+        <div class="stat-label">{{ t('volume') }}</div>
+        <div class="stat-value">{{ "{:,}".format(data.snapshot.volume) }}</div>
+        <div class="stat-note">{{ data.snapshot.date }} {{ t('close_suffix') }}</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">RSI</div>
+        <div class="stat-value">{{ data.indicators.rsi }}</div>
+        <div class="stat-note">{{ tn(data.indicators.rsi_note) }}</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">MACD</div>
+        <div class="stat-value {{ 'up' if data.indicators.macd > data.indicators.macd_signal else 'down' }}">
+          {{ data.indicators.macd }}
+        </div>
+        <div class="stat-note">{{ tn(data.indicators.macd_note) }}</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">{{ t('trend') }}</div>
+        {% if data.indicators.sma_short and data.indicators.sma_long %}
+          <div class="stat-value {{ 'up' if data.indicators.sma_short > data.indicators.sma_long else 'down' }}">
+            {{ t('uptrend') if data.indicators.sma_short > data.indicators.sma_long else t('downtrend') }}
+          </div>
+          <div class="stat-note">SMA20 {{ data.indicators.sma_short }} / SMA50 {{ data.indicators.sma_long }}</div>
+        {% else %}
+          <div class="stat-value">—</div>
+          <div class="stat-note">{{ t('not_enough_data') }}</div>
+        {% endif %}
+      </div>
+      <div class="stat-tile">
+        <div class="stat-label">{{ t('volatility') }}</div>
+        {% if data.volatility and data.volatility.available %}
+          <div class="stat-value {{ 'down' if data.volatility.regime == 'Yüksek' else ('up' if data.volatility.regime == 'Düşük' else '') }}">
+            {{ tn(data.volatility.regime) }}
+          </div>
+          <div class="stat-note">%{{ data.volatility.current_volatility_pct }} {{ t('daily_egarch') }}</div>
+        {% else %}
+          <div class="stat-value">—</div>
+          <div class="stat-note">{{ t('could_not_calculate') }}</div>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  <section class="block">
+    <div class="section-head">
+      <h2>{{ t('charts_title') }}</h2>
+      <button type="button" id="chart-refresh-btn" class="icon-btn" title="{{ t('chart_refresh_title') }}" aria-label="{{ t('chart_refresh_title') }}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 1 1-3-6.7"></path>
+          <polyline points="21 3 21 9 15 9"></polyline>
+        </svg>
+      </button>
+    </div>
+    <p id="charts-error" class="muted small"></p>
+    <div class="chart-tabs">
+      <button type="button" class="chart-tab-btn active" data-target="priceChart">{{ t('tab_price') }}</button>
+      <button type="button" class="chart-tab-btn" data-target="rsiChart">{{ t('tab_rsi') }}</button>
+      <button type="button" class="chart-tab-btn" data-target="macdChart">{{ t('tab_macd') }}</button>
+      <button type="button" class="chart-tab-btn" data-target="intradayChart">{{ t('tab_intraday') }}</button>
+    </div>
+    <div class="chart-stage">
+      <div class="chart-pane active" data-pane="priceChart">
+        <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+      </div>
+      <div class="chart-pane" data-pane="rsiChart">
+        <div class="chart-canvas-wrap"><canvas id="rsiChart"></canvas></div>
+      </div>
+      <div class="chart-pane" data-pane="macdChart">
+        <div class="chart-canvas-wrap"><canvas id="macdChart"></canvas></div>
+      </div>
+      <div class="chart-pane" data-pane="intradayChart">
+        <div class="range-tabs">
+          <button type="button" class="range-tab-btn active" data-range="1d">{{ t('range_daily') }}</button>
+          <button type="button" class="range-tab-btn" data-range="1w">{{ t('range_weekly') }}</button>
+          <button type="button" class="range-tab-btn" data-range="1mo">{{ t('range_monthly') }}</button>
+          <button type="button" class="range-tab-btn" data-range="6mo">{{ t('range_6m') }}</button>
+          <button type="button" class="range-tab-btn" data-range="1y">{{ t('range_1y') }}</button>
+        </div>
+        <p id="intraday-status" class="muted small"></p>
+        <div class="chart-canvas-wrap"><canvas id="intradayChart"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  {% if data and data.chart_readings %}
     <section class="block">
-      <h2>Fiyat</h2>
-      <p>
-        <strong>{{ data.snapshot.last_close }} TL</strong>
-        <span class="pct {{ 'up' if data.snapshot.change_pct > 0 else ('down' if data.snapshot.change_pct < 0 else '') }}">
-          ({{ "%+.2f"|format(data.snapshot.change) }} / {{ "%+.2f"|format(data.snapshot.change_pct) }}%)
-        </span>
-        — {{ data.snapshot.date }}
-      </p>
-      <p class="muted">Hacim: {{ "{:,}".format(data.snapshot.volume) }}</p>
+      <h2>{{ t('chart_reading_title') }}</h2>
+      <p class="reading-pane active" data-reading="priceChart">{{ data.chart_readings.price or t('chart_reading_missing') }}</p>
+      <p class="reading-pane" data-reading="rsiChart">{{ data.chart_readings.rsi or t('chart_reading_missing') }}</p>
+      <p class="reading-pane" data-reading="macdChart">{{ data.chart_readings.macd or t('chart_reading_missing') }}</p>
+      <p class="reading-pane" data-reading="intradayChart">{{ t('chart_reading_intraday') }}</p>
+      <p class="muted small">{{ t('chart_reading_disclaimer') }}</p>
     </section>
+  {% endif %}
 
+  {% if data %}
     <section class="block">
-      <h2>Teknik Göstergeler</h2>
-      <ul>
-        <li>RSI ({{ data.indicators.rsi }}): {{ data.indicators.rsi_note }}</li>
-        <li>MACD ({{ data.indicators.macd }} / sinyal {{ data.indicators.macd_signal }}): {{ data.indicators.macd_note }}</li>
-        <li>SMA20 ({{ data.indicators.sma_short }}) vs SMA50 ({{ data.indicators.sma_long }}): {{ data.indicators.trend_note }}</li>
-      </ul>
-    </section>
-
-    <section class="block">
-      <h2>Geçmiş İstatistik (RSI Aşırı Satım Sonrası, 5 gün)</h2>
-      {% if data.backtest.sample_size > 0 %}
-        <ul>
-          <li>Geçmişte {{ data.backtest.sample_size }} kez bu koşul oluşmuş.</li>
-          <li>5 gün sonra ortalama getiri: %{{ data.backtest.avg_return_pct }}</li>
-          <li>Pozitif kapanan durum oranı: %{{ data.backtest.win_rate }}</li>
-        </ul>
-        <p class="muted small">Küçük örneklem boyutları istatistiksel olarak güvenilir olmayabilir.</p>
+      <h2>{{ t('forecast_title') }}</h2>
+      {% if data.forecast and data.forecast.available %}
+        <p>
+          <strong class="mono">{{ data.forecast.p10 }} TL – {{ data.forecast.p90 }} TL</strong>
+          <span class="muted">({{ t('forecast_median') }} {{ data.forecast.median }} TL, {{ "%+.2f"|format(data.forecast.median_change_pct) }}%)</span>
+        </p>
+        <p class="muted small">
+          {{ data.forecast.horizon_days }} {{ t('forecast_range_suffix') }}
+          {{ tn(data.forecast.method) }}.
+        </p>
+        <p class="muted small">{{ t('forecast_disclaimer') }}</p>
       {% else %}
-        <p class="muted">Son dönemde bu koşul (RSI ≤ 30) hiç oluşmamış.</p>
+        <p class="muted">{{ tn((data.forecast.reason if data.forecast else None) or t('could_not_calculate')) }}</p>
       {% endif %}
     </section>
 
+    <details class="acc">
+      <summary>{{ t('backtest_title') }} <span class="acc-icon">+</span></summary>
+      <div class="acc-body">
+        {% if data.backtest.sample_size > 0 %}
+          <ul>
+            <li>{{ t('backtest_occurred', n=data.backtest.sample_size) }}</li>
+            <li>{{ t('backtest_avg_return') }}: %{{ data.backtest.avg_return_pct }}</li>
+            <li>{{ t('backtest_win_rate') }}: %{{ data.backtest.win_rate }}</li>
+          </ul>
+          <p class="muted small">{{ t('backtest_small_sample') }}</p>
+        {% else %}
+          <p class="muted">{{ t('backtest_none') }}</p>
+        {% endif %}
+      </div>
+    </details>
+
+    {% if data.ipo_signal and data.ipo_signal.available %}
+      {% set ipo = data.ipo_signal %}
+      <details class="acc">
+        <summary>{{ t('ipo_title') }} <span class="acc-icon">+</span></summary>
+        <div class="acc-body">
+          <p>
+            <strong>{{ t('ipo_current_streak') }}:</strong>
+            {% if ipo.current_streak_type %}
+              {{ t('ipo_streak_days', n=ipo.current_streak_length, type=tn(ipo.current_streak_type)) }}
+            {% else %}
+              {{ t('ipo_no_streak') }}
+            {% endif %}
+          </p>
+          <p class="muted small">{{ t('ipo_summary', tavan=ipo.total_tavan_days, taban=ipo.total_taban_days, date=ipo.listing_date, days=ipo.trading_days_since_listing) }}</p>
+          <p class="muted small">{{ t('ipo_longest', tavan=ipo.longest_tavan_streak, taban=ipo.longest_taban_streak) }}</p>
+          {% if ipo.break_stats and ipo.break_stats.available %}
+            <p class="muted small">{{ t('ipo_break_stats', n=ipo.break_stats.sample_size, avg=ipo.break_stats.avg_return_5d_pct, win=ipo.break_stats.win_rate) }}</p>
+          {% else %}
+            <p class="muted small">{{ t('ipo_break_stats_none') }}</p>
+          {% endif %}
+          {% if ipo.ai_assessment %}
+            <p><strong>{{ t('ipo_ai_label') }}:</strong> {{ ipo.ai_assessment }}</p>
+          {% endif %}
+          <p class="muted small">{{ t('ipo_disclaimer') }}</p>
+        </div>
+      </details>
+    {% endif %}
+
+    <details class="acc">
+      <summary>{{ t('volatility_detail_title') }} <span class="acc-icon">+</span></summary>
+      <div class="acc-body">
+        {% if data.volatility and data.volatility.available %}
+          {% if data.volatility.leverage_ratio_30d is not none %}
+            <p class="muted small">
+              {{ t('leverage_effect', ratio=data.volatility.leverage_ratio_30d, gamma=data.volatility.gamma) }}
+            </p>
+          {% endif %}
+          <p class="muted small">{{ t('volatility_disclaimer') }}</p>
+          {% if data.volatility.regime == "Yüksek" %}
+            <p class="small">
+              ⚠️ <strong>{{ t('high_volatility_title') }}</strong> {{ t('high_volatility_note') }}
+            </p>
+          {% endif %}
+        {% else %}
+          <p class="muted">{{ tn((data.volatility.reason if data.volatility else None) or t('could_not_calculate')) }}</p>
+        {% endif %}
+      </div>
+    </details>
+
+    <details class="acc">
+      <summary>{{ t('rd_title') }} <span class="muted small">{{ t('rd_subtitle') }}</span> <span class="acc-icon">+</span></summary>
+      <div class="acc-body">
+        {% if data.rd_signal and data.rd_signal.available %}
+          {% set rd = data.rd_signal %}
+          <p>
+            <strong>{{ t('rd_intensity') }}: %{{ "%.1f"|format(rd.avg_intensity * 100) }}</strong>
+            <span class="muted">({{ t('rd_avg_years', n=rd.years_used|length, years=rd.years_used|join(", "), trend=tn(rd.trend)) }})</span>
+          </p>
+          {% if rd.efficiency_ratio is not none %}
+            <p class="muted small">{{ t('rd_efficiency') }}: {{ rd.efficiency_ratio }}</p>
+          {% endif %}
+          <p class="muted small">{{ t('rd_group') }}: {{ tn(rd.group) }}</p>
+          <p class="muted small">{{ t('rd_disclaimer') }}</p>
+        {% else %}
+          <p class="muted">{{ (data.rd_signal.reason if data.rd_signal else None) or t('rd_not_calculated') }}</p>
+        {% endif %}
+      </div>
+    </details>
+
+    <details class="acc">
+      <summary>{{ t('news_title') }} <span class="muted small">({{ data.sentiment.count }} {{ t('news_count_suffix') }})</span> <span class="acc-icon">+</span></summary>
+      <div class="acc-body">
+        <p>{{ tn(data.sentiment.label) }} ({{ t('news_score') }}: {{ data.sentiment.average_score }})</p>
+        <ul class="news-list">
+          {% for item in data.news %}
+            <li>
+              <span class="{{ 'up' if item.score > 0 else ('down' if item.score < 0 else '') }}">&#9679;</span>
+              <a href="{{ item.link }}" target="_blank" rel="noopener">{{ item.title }}</a>
+              <span class="muted small">{{ item.published }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </details>
+
     <section class="block">
-      <h2>Haber Duyarlılığı ({{ data.sentiment.count }} haber tarandı)</h2>
-      <p>{{ data.sentiment.label }} (skor: {{ data.sentiment.average_score }})</p>
-      <ul class="news-list">
-        {% for item in data.news %}
-          <li>
-            <span class="{{ 'up' if item.score > 0 else ('down' if item.score < 0 else '') }}">&#9679;</span>
-            <a href="{{ item.link }}" target="_blank" rel="noopener">{{ item.title }}</a>
-            <span class="muted small">{{ item.published }}</span>
-          </li>
-        {% endfor %}
-      </ul>
+      <h2>{{ t('chat_title') }}</h2>
+      <p class="muted small">{{ t('chat_subtitle') }}</p>
+      <div class="chat-quick-btns">
+        <button type="button" class="chat-chip" data-q="rsi">{{ t('chat_q_rsi') }}</button>
+        <button type="button" class="chat-chip" data-q="macd">{{ t('chat_q_macd') }}</button>
+        <button type="button" class="chat-chip" data-q="trend">{{ t('chat_q_trend') }}</button>
+        <button type="button" class="chat-chip" data-q="tahmin">{{ t('chat_q_forecast') }}</button>
+        <button type="button" class="chat-chip" data-q="volatilite">{{ t('chat_q_volatility') }}</button>
+        <button type="button" class="chat-chip" data-q="arge">{{ t('chat_q_rd') }}</button>
+        <button type="button" class="chat-chip" data-q="haber">{{ t('chat_q_news') }}</button>
+        {% if data.ipo_signal and data.ipo_signal.available %}
+          <button type="button" class="chat-chip" data-q="tavan">{{ t('chat_q_ipo') }}</button>
+        {% endif %}
+        <button type="button" class="chat-chip" data-q="özet">{{ t('chat_q_summary') }}</button>
+      </div>
+      <div class="chat-messages" id="chat-messages"></div>
+      <form class="chat-input-row" id="chat-form">
+        <input type="text" id="chat-input" class="ticker-add-input" placeholder="{{ t('chat_placeholder') }}" autocomplete="off">
+        <button type="submit" class="ticker-add-btn">{{ t('chat_send') }}</button>
+      </form>
     </section>
+
+    {% if data.ai_comment %}
+      <section class="block">
+        <h2>{{ t('ai_comment_title') }}</h2>
+        <p>{{ data.ai_comment }}</p>
+        <p class="muted small">{{ t('ai_comment_disclaimer') }}</p>
+      </section>
+    {% endif %}
   {% endif %}
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="{{ url_for('static', filename='charts.js') }}"></script>
+  <script src="{{ url_for('static', filename='chat.js') }}"></script>
+  <script>
+    initTickerChat("{{ ticker }}", { chatError: {{ t('chat_error')|tojson }} });
+    initTickerCharts("{{ ticker }}", {
+      close: {{ t('chart_label_close')|tojson }},
+      overbought: {{ t('chart_label_overbought')|tojson }},
+      oversold: {{ t('chart_label_oversold')|tojson }},
+      histogram: {{ t('chart_label_histogram')|tojson }},
+      signal: {{ t('chart_label_signal')|tojson }},
+      price: {{ t('chart_label_price')|tojson }},
+      errorData: {{ t('chart_error_data')|tojson }},
+      errorGeneric: {{ t('chart_error_generic')|tojson }},
+      intraday1d: {{ t('intraday_status_1d')|tojson }},
+      intraday1w: {{ t('intraday_status_1w')|tojson }},
+      intraday1mo: {{ t('intraday_status_1mo')|tojson }},
+      intraday6mo: {{ t('intraday_status_6mo')|tojson }},
+      intraday1y: {{ t('intraday_status_1y')|tojson }},
+    });
+  </script>
 {% endblock %}

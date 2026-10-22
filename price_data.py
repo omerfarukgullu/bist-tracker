@@ -26,6 +26,42 @@ def fetch_history(ticker: str) -> pd.DataFrame:
     return df
 
 
+# "Anlık" sekmesindeki periyot seçenekleri: her biri için yfinance'a
+# sorulacak (period, interval) ve son çekilen pencerenin tek işlem gününe
+# kırpılıp kırpılmayacağı (trim_to_last_day — sadece "1d" için gerekli,
+# hafta sonu/tatilde bile en son işlem gününü göstermek için).
+INTRADAY_RANGES = {
+    "1d": {"period": "5d", "interval": "5m", "trim_to_last_day": True, "label": "Günlük"},
+    "1w": {"period": "5d", "interval": "15m", "trim_to_last_day": False, "label": "Haftalık"},
+    "1mo": {"period": "1mo", "interval": "60m", "trim_to_last_day": False, "label": "Aylık"},
+    "6mo": {"period": "6mo", "interval": "1d", "trim_to_last_day": False, "label": "6 Aylık"},
+    "1y": {"period": "1y", "interval": "1d", "trim_to_last_day": False, "label": "Yıllık"},
+}
+
+
+def fetch_intraday(ticker: str, range_key: str = "1d") -> pd.DataFrame:
+    """
+    "Anlık" sekmesi için seçilen periyoda (INTRADAY_RANGES) göre fiyat
+    verisi döndürür. "1d" için hafta sonu/tatilde bile son işlem gününü
+    göstermek üzere birkaç günlük pencere çekip en son tarihe kırpılır.
+    """
+    cfg = INTRADAY_RANGES.get(range_key, INTRADAY_RANGES["1d"])
+    symbol = f"{ticker}.IS"
+    df = yf.Ticker(symbol).history(period=cfg["period"], interval=cfg["interval"])
+
+    if df.empty:
+        raise ValueError(
+            f"{ticker} için veri bulunamadı. Yahoo Finance bu hisse için "
+            f"bu periyotta veri sağlamıyor olabilir."
+        )
+
+    df = df.dropna()
+    if cfg["trim_to_last_day"]:
+        last_date = df.index[-1].date()
+        df = df[df.index.date == last_date]
+    return df
+
+
 def latest_snapshot(df: pd.DataFrame) -> dict:
     """Son işlem gününe ait özet bilgiyi çıkarır."""
     last = df.iloc[-1]

@@ -1,6 +1,28 @@
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+
+# Sanal ortamlar
+venv/
+.venv/
+env/
+
+# Gizli bilgiler ve yerel durum (ASLA commit edilmez)
 .env
+secret_key.txt
+users.db
+
+# Üretilen/önbellek verisi
 cache.json
+rd_cache.json
+tickers.json
 raporlar/*.md
 !raporlar/.gitkeep
+
+# Editör / işletim sistemi
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log

@@ -8,8 +8,143 @@ import os
 from datetime import datetime
 
 
+def build_volatility_section(vol: dict) -> str:
+    lines = ["### Volatilite Rejimi (EGARCH)"]
+    if not vol or not vol.get("available"):
+        reason = (vol or {}).get("reason", "Hesaplanamadı")
+        lines.append(f"- {reason}")
+        lines.append("")
+        return "\n".join(lines)
+
+    lines.append(f"- Güncel koşullu volatilite: %{vol['current_volatility_pct']} (günlük)")
+    lines.append(f"- Rejim: **{vol['regime']} Volatilite** (tarihsel %33/%67 persentile göre)")
+    if vol.get("leverage_ratio_30d") is not None:
+        lines.append(
+            f"- Kaldıraç etkisi (son 30 gün): düşüş günlerinde ortalama koşullu "
+            f"volatilite, yükseliş günlerine göre {vol['leverage_ratio_30d']}× "
+            f"(EGARCH asimetri katsayısı: {vol.get('gamma')})"
+        )
+    lines.append(
+        "- *(Not: Bu bir volatilite TAHMİNİ değildir — geçmiş fiyat "
+        "hareketlerinden hesaplanan güncel durumun özetidir. Model kısa veri "
+        "pencerelerinde belirsizlik taşıyabilir; yatırım tavsiyesi değildir.)*"
+    )
+    if vol["regime"] == "Yüksek":
+        lines.append("")
+        lines.append(
+            "> ⚠️ **Yüksek Volatilite Rejimi.** Fiyat hareketleri tarihsel "
+            "olarak geniş bantta seyrediyor. Bu bir tavsiye değildir; "
+            "pozisyon büyüklüğü ve stop-loss disiplinine dikkat etmek "
+            "isteyebilirsin."
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def build_rd_section(ticker: str, rd: dict) -> str:
+    lines = ["### AR-GE Sinyali (Çeyreklik/Yıllık — Ayrı Job, `arge_sinyali.py`)"]
+    if not rd or not rd.get("available"):
+        reason = (rd or {}).get("reason", "Henüz hesaplanmamış (`python arge_sinyali.py` çalıştırılmalı).")
+        lines.append(f"- {reason}")
+        lines.append("")
+        return "\n".join(lines)
+
+    trend_arrow = {"Artıyor": "↑", "Azalıyor": "↓", "Stabil": "→"}.get(rd["trend"], "")
+    lines.append(
+        f"- AR-GE Yoğunluğu (ortalama, son {len(rd['years_used'])} yıl — "
+        f"{', '.join(rd['years_used'])}): %{rd['avg_intensity'] * 100:.1f} "
+        f"({trend_arrow} {rd['trend'].lower()})"
+    )
+    if rd.get("efficiency_ratio") is not None:
+        lines.append(f"- Verimlilik Katsayısı (bilgilendirici oran): {rd['efficiency_ratio']}")
+    lines.append(f"- Grup (bilgilendirici sınıflandırma): {rd['group']}")
+    lines.append(
+        "- *(Not: Bu sınıflandırma ve oran doğrulanmış bir yatırım sinyali "
+        "değildir — geçmiş AR-GE gideri/satış oranını geçmiş getiriyle "
+        "karşılaştıran basit, şeffaf bir özet istatistiktir. AR-GE'nin fiyata "
+        "etkisi literatürde genelde gecikmeli olur; azalan trend uzun vadeli "
+        "rekabet gücü açısından izlenmesi gereken bir sinyal olabilir, kesin "
+        "bir öngörü değildir. Yatırım tavsiyesi değildir.)*"
+    )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def build_chart_readings_section(chart_readings: dict) -> str:
+    labels = {"price": "Fiyat / SMA", "rsi": "RSI", "macd": "MACD"}
+    lines = ["### Grafik Okumaları (AI, görsel)"]
+
+    if not chart_readings or not any(chart_readings.values()):
+        lines.append("- Henüz üretilmemiş (ANTHROPIC_API_KEY ayarlı değil ya da üretim başarısız oldu).")
+        lines.append("")
+        return "\n".join(lines)
+
+    for key, label in labels.items():
+        reading = chart_readings.get(key)
+        if reading:
+            lines.append(f"**{label}:** {reading}")
+            lines.append("")
+    lines.append(
+        "*(Bu okumalar, ilgili grafik yapay zeka ile görsel olarak "
+        "incelenerek üretilmiştir; yatırım tavsiyesi değildir.)*"
+    )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def build_ipo_signal_section(ipo: dict) -> str:
+    lines = ["### Yeni Halka Arz — Tavan/Taban Seri Analizi"]
+    if not ipo or not ipo.get("available"):
+        return ""  # Yeni halka arz olmayan hisseler için bölüm hiç eklenmez.
+
+    if ipo.get("current_streak_type"):
+        lines.append(
+            f"- Mevcut seri: **{ipo['current_streak_length']} gündür üst üste "
+            f"{ipo['current_streak_type']}**."
+        )
+    else:
+        lines.append("- Şu anda aktif bir tavan/taban serisi yok.")
+
+    lines.append(
+        f"- Bugüne kadar: {ipo['total_tavan_days']} tavan günü, "
+        f"{ipo['total_taban_days']} taban günü (borsaya giriş: {ipo['listing_date']}, "
+        f"{ipo['trading_days_since_listing']} işlem günü geçti)."
+    )
+    lines.append(
+        f"- En uzun tavan serisi: {ipo['longest_tavan_streak']} gün, "
+        f"en uzun taban serisi: {ipo['longest_taban_streak']} gün."
+    )
+
+    bs = ipo.get("break_stats") or {}
+    if bs.get("available"):
+        lines.append(
+            f"- Geçmişte kırılan {bs['sample_size']} tavan serisinden sonraki 5 işlem "
+            f"gününde ortalama getiri: %{bs['avg_return_5d_pct']:+.2f} "
+            f"(pozitif kapanma oranı: %{bs['win_rate']})."
+        )
+    else:
+        lines.append(f"- {bs.get('reason', 'Kırılma sonrası istatistiği için yeterli geçmiş yok.')}")
+
+    if ipo.get("ai_assessment"):
+        lines.append("")
+        lines.append(f"**AI Değerlendirmesi (spekülatif):** {ipo['ai_assessment']}")
+
+    lines.append(
+        "- *(Not: Bu, GELECEK TAHMİNİ değildir — 'kaç tavan daha yapar' ya da "
+        "'ne zaman bozar' sorusuna kesin bir cevap üretilemez. Sadece hissenin "
+        "kendi geçmişine dayalı şeffaf bir seri özetidir. Tavan/taban günleri, "
+        "BIST'in standart günlük fiyat bandına (~%10) yakın getiri eşiğiyle "
+        "yaklaşık olarak belirlenir. Yatırım tavsiyesi değildir.)*"
+    )
+    lines.append("")
+    return "\n".join(lines)
+
+
 def build_ticker_section(ticker: str, snapshot: dict, ind: dict,
-                          news_items: list, sentiment: dict, bt: dict) -> str:
+                          news_items: list, sentiment: dict, bt: dict,
+                          forecast: dict = None, ai_comment: str = None,
+                          volatility: dict = None, rd: dict = None,
+                          chart_readings: dict = None, ipo_signal: dict = None) -> str:
     lines = [f"## {ticker}", ""]
 
     lines.append(f"**Son Kapanış:** {snapshot['last_close']} TL "
@@ -24,6 +159,8 @@ def build_ticker_section(ticker: str, snapshot: dict, ind: dict,
     lines.append(f"- SMA20 ({ind['sma_short']}) vs SMA50 ({ind['sma_long']}): {ind['trend_note']}")
     lines.append("")
 
+    lines.append(build_chart_readings_section(chart_readings))
+
     lines.append("### Geçmiş İstatistik (RSI Aşırı Satım Sonrası, 5 gün)")
     if bt["sample_size"] > 0:
         lines.append(f"- Geçmişte {bt['sample_size']} kez bu koşul oluşmuş.")
@@ -33,6 +170,43 @@ def build_ticker_section(ticker: str, snapshot: dict, ind: dict,
     else:
         lines.append("- Son dönemde bu koşul (RSI ≤ 30) hiç oluşmamış.")
     lines.append("")
+
+    lines.append("### Önümüzdeki Ay İçin İstatistiksel Aralık (Tahmin Değil)")
+    if forecast and forecast.get("available"):
+        lines.append(f"- Yöntem: {forecast['method']}")
+        lines.append(
+            f"- {forecast['horizon_days']} işlem günü sonrası %10-%90 aralık: "
+            f"{forecast['p10']} TL – {forecast['p90']} TL (medyan {forecast['median']} TL)"
+        )
+        lines.append(f"- Medyan senaryo değişimi: %{forecast['median_change_pct']:+.2f}")
+        lines.append(
+            "- *(Bu bir tahmin/garanti değildir — geçmiş volatiliteye dayalı "
+            "istatistiksel bir aralıktır. Gerçek fiyat bu aralığın dışında da "
+            "kalabilir; trend/haber gibi hiçbir sinyali hesaba katmaz.)*"
+        )
+    else:
+        reason = (forecast or {}).get("reason", "Hesaplanamadı")
+        lines.append(f"- {reason}")
+    lines.append("")
+
+    lines.append(build_volatility_section(volatility))
+
+    if ai_comment:
+        lines.append("### AI Yorumu (Veri Sentezi)")
+        lines.append(ai_comment)
+        lines.append("")
+        lines.append(
+            "*(Bu paragraf yukarıdaki veriler temel alınarak yapay zeka ile "
+            "üretilmiştir; yeni bir analiz değil, mevcut verinin özetidir. "
+            "Yatırım tavsiyesi değildir.)*"
+        )
+        lines.append("")
+
+    ipo_section = build_ipo_signal_section(ipo_signal)
+    if ipo_section:
+        lines.append(ipo_section)
+
+    lines.append(build_rd_section(ticker, rd))
 
     lines.append(f"### Haber Duyarlılığı ({sentiment['count']} haber tarandı)")
     lines.append(f"- Genel eğilim: {sentiment['label']} (skor: {sentiment['average_score']})")
@@ -56,7 +230,7 @@ def build_report(sections: list, output_dir: str) -> str:
     filename = os.path.join(output_dir, f"rapor_{today}.md")
 
     header = [
-        f"# BIST Günlük Takip Raporu — {today}",
+        f"# BIST Tracker — Günlük Rapor: {today}",
         "",
         "> Bu rapor otomatik üretilmiştir. Teknik göstergeler ve haber "
         "duyarlılığı mevcut durumun özetidir; **yatırım tavsiyesi değildir** "

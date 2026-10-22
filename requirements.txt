@@ -1,8 +1,26 @@
+# Üst sınırlar (<X) kasıtlıdır: bu projede sürüm sabitlenmediği için bir
+# bağımlılığın yeni major sürümü sessizce kurulup çalışmayı bozabiliyordu.
+# Major sürüm atlamaları elle test edilip yükseltilmelidir.
+
+# yfinance, Yahoo'nun resmi olmayan API'sini takip ettiği için sık sık
+# güncelleme gerektirir — kasıtlı olarak üst sınır konulmadı.
 yfinance>=0.2.40
-pandas>=2.0.0
-feedparser>=6.0.10
-requests>=2.31.0
-Flask>=3.0.0
-gunicorn>=22.0.0
-python-dotenv>=1.0.0
-Markdown>=3.6
+
+pandas>=2.0.0,<3.0.0
+numpy>=1.26.0,<3.0.0
+feedparser>=6.0.10,<7.0.0
+requests>=2.31.0,<3.0.0
+Flask>=3.0.0,<4.0.0
+Flask-Login>=0.6.3,<1.0.0
+gunicorn>=22.0.0,<24.0.0
+python-dotenv>=1.0.0,<2.0.0
+Markdown>=3.6,<4.0.0
+
+# anthropic 1.x breaking change'ler içeriyor (httpx2'ye geçiş, kaldırılan
+# parametreler). Yükseltme ayrı bir iş olarak yapılmalı.
+anthropic>=0.69.0,<1.0.0
+
+APScheduler>=3.10.4,<4.0.0
+arch>=6.3.0,<8.0.0
+isyatirimhisse>=5.0.0,<6.0.0
+matplotlib>=3.8.0,<4.0.0

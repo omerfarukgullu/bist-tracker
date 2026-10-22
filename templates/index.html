@@ -1,37 +1,60 @@
 {% extends "base.html" %}
-{% block title %}Panel — BIST Takip{% endblock %}
+{% block title %}{{ t('panel_title') }} — BIST Tracker{% endblock %}
 {% block content %}
-  <h1>Panel</h1>
+  <h1>{{ t('panel_title') }}</h1>
   {% if updated_at %}
-    <p class="muted">Son güncelleme: {{ updated_at }}</p>
+    <p class="muted small">{{ t('last_updated') }}: {{ updated_at }}</p>
   {% else %}
-    <p class="muted">Henüz veri yok. İlk analiz çalıştığında burada görünecek.</p>
+    <p class="muted">{{ t('no_data_yet') }}</p>
   {% endif %}
+
+  {% if error %}
+    <p class="msg-error">{{ error }}</p>
+  {% endif %}
+  {% if info %}
+    <p class="msg-info">{{ info }}</p>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('add_ticker_route') }}" class="ticker-add-form">
+    <input type="text" name="ticker" class="ticker-add-input mono" placeholder="{{ t('ticker_add_placeholder') }}" maxlength="10" required autocapitalize="characters" autocomplete="off">
+    <button type="submit" class="ticker-add-btn">{{ t('ticker_add_btn') }}</button>
+  </form>
+  <p class="muted small" style="margin-top: 4px;">{{ t('ticker_add_hint') }}</p>
 
   <div class="card-grid">
     {% for ticker in tickers %}
       {% set data = tickers_data.get(ticker) %}
-      <a class="card" href="{{ url_for('ticker_detail', ticker=ticker) }}">
-        <div class="card-head">
-          <span class="ticker">{{ ticker }}</span>
-          {% if data %}
-            {% set chg = data.snapshot.change_pct %}
-            <span class="pct {{ 'up' if chg > 0 else ('down' if chg < 0 else '') }}">
-              {{ "%+.2f"|format(chg) }}%
-            </span>
-          {% endif %}
-        </div>
-        {% if data %}
-          <div class="price">{{ data.snapshot.last_close }} TL</div>
-          <div class="badges">
-            <span class="badge">RSI {{ data.indicators.rsi }}</span>
-            <span class="badge">{{ data.sentiment.label }}</span>
+      {% set chg = data.snapshot.change_pct if data else 0 %}
+      <div class="card {{ 'is-up' if data and chg > 0 else ('is-down' if data and chg < 0 else '') }}">
+        <form method="post" action="{{ url_for('remove_ticker_route') }}" class="card-remove-form"
+              onsubmit="return confirm('{{ t('ticker_remove_confirm', ticker=ticker) }}');">
+          <input type="hidden" name="ticker" value="{{ ticker }}">
+          <button type="submit" class="card-remove-btn" title="{{ t('ticker_remove_title') }}" aria-label="{{ ticker }} {{ t('ticker_remove_title') }}">×</button>
+        </form>
+        <a class="card-link" href="{{ url_for('ticker_detail', ticker=ticker) }}">
+          <div class="card-head">
+            <span class="ticker">{{ ticker }}</span>
+            {% if data %}
+              <span class="pct-pill {{ 'up' if chg > 0 else ('down' if chg < 0 else 'flat') }}">
+                {{ '▲' if chg > 0 else ('▼' if chg < 0 else '—') }} {{ "%+.2f"|format(chg) }}%
+              </span>
+            {% endif %}
           </div>
-          <div class="muted small">{{ data.indicators.trend_note }}</div>
-        {% else %}
-          <div class="muted">Veri yok</div>
-        {% endif %}
-      </a>
+          {% if data %}
+            <div class="price">{{ data.snapshot.last_close }} TL</div>
+            <div class="badges">
+              <span class="badge">RSI {{ data.indicators.rsi }}</span>
+              <span class="badge">{{ tn(data.sentiment.label) }}</span>
+              {% if data.volatility and data.volatility.available %}
+                <span class="badge">{{ tn(data.volatility.regime) }} Vol.</span>
+              {% endif %}
+            </div>
+            <div class="muted small">{{ tn(data.indicators.trend_note) }}</div>
+          {% else %}
+            <div class="muted">{{ t('no_data') }}</div>
+          {% endif %}
+        </a>
+      </div>
     {% endfor %}
   </div>
 {% endblock %}

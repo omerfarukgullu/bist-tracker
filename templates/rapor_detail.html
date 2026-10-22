@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}{{ filename }} — BIST Takip{% endblock %}
+{% block title %}{{ filename }} — BIST Tracker{% endblock %}
 {% block content %}
-  <p><a href="{{ url_for('raporlar_list') }}">&larr; Raporlar</a></p>
+  <p><a href="{{ url_for('raporlar_list') }}">&larr; {{ t('nav_reports') }}</a></p>
   <article class="rapor">
     {{ content | safe }}
   </article>

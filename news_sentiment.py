@@ -9,8 +9,14 @@ Ciddi kararlar için haberlerin kendisini mutlaka oku.
 """
 
 import feedparser
+import requests
 from urllib.parse import quote
 from config import NEWS_LIMIT_PER_TICKER
+
+# feedparser.parse(url) kendi indirmesini yapar ve HİÇBİR timeout uygulamaz —
+# Google News yanıt vermediğinde günlük analiz süresiz askıda kalıyordu.
+# İndirmeyi requests ile (timeout'lu) yapıp feedparser'a hazır metni veriyoruz.
+NEWS_FETCH_TIMEOUT = 15
 
 POSITIVE_WORDS = [
     "kar", "kâr", "artış", "yükseldi", "yükseliş", "rekor", "büyüme",
@@ -45,7 +51,16 @@ def fetch_news(ticker: str, company_hint: str = "") -> list:
     query = quote(f"{ticker} {company_hint} hisse".strip())
     url = f"https://news.google.com/rss/search?q={query}&hl=tr&gl=TR&ceid=TR:tr"
 
-    feed = feedparser.parse(url)
+    try:
+        resp = requests.get(
+            url, timeout=NEWS_FETCH_TIMEOUT, headers={"User-Agent": "Mozilla/5.0"}
+        )
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        print(f"[{ticker}] haberler çekilemedi: {e}")
+        return []
+
+    feed = feedparser.parse(resp.content)
     items = []
     for entry in feed.entries[:NEWS_LIMIT_PER_TICKER]:
         title = entry.get("title", "")

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ t('register_title') }} — BIST Tracker{% endblock %}
+{% block content %}
+  <div class="auth-wrap">
+    <div class="card auth-card">
+      <h1>{{ t('register_title') }}</h1>
+      {% if error %}
+        <p class="msg-error">{{ error }}</p>
+      {% endif %}
+      <form method="post" class="auth-form">
+        <label class="field">
+          <span>{{ t('field_username') }}</span>
+          <input type="text" name="username" class="ticker-add-input auth-input" value="{{ username or '' }}" required autofocus autocomplete="username" pattern="[A-Za-z0-9_]{3,30}">
+        </label>
+        <label class="field">
+          <span>{{ t('field_email') }}</span>
+          <input type="email" name="email" class="ticker-add-input auth-input" value="{{ email or '' }}" required autocomplete="email">
+        </label>
+        <label class="field">
+          <span>{{ t('field_password') }}</span>
+          <input type="password" name="password" class="ticker-add-input auth-input" required minlength="6" autocomplete="new-password">
+        </label>
+        <label class="field">
+          <span>{{ t('field_password_confirm') }}</span>
+          <input type="password" name="password_confirm" class="ticker-add-input auth-input" required minlength="6" autocomplete="new-password">
+        </label>
+        <button type="submit" class="ticker-add-btn auth-submit">{{ t('register_btn') }}</button>
+      </form>
+      <p class="muted small auth-switch">{{ t('register_have_account') }} <a href="{{ url_for('login') }}">{{ t('login_title') }}</a></p>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+          cache: pip
+
+      - name: Bağımlılıkları kur
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff
+
+      - name: Lint (pyflakes + sözdizimi hataları)
+        run: ruff check --select F,E9 .
+
+      - name: Tüm dosyaları derle
+        run: python -m compileall -q .
+
+      - name: config.py içe aktarmalarını doğrula
+        run: python tools/check_config_imports.py
+
+      - name: Modüller içe aktarılabiliyor mu (ağ erişimi olmadan)
+        env:
+          SECRET_KEY: ci-smoke-test-key
+        run: |
+          python -c "import app;        print('app ok')"
+          python -c "import main;       print('main ok')"
+          python -c "import arge_sinyali; print('arge_sinyali ok')"
+          python -c "import bot_listener; print('bot_listener ok')"

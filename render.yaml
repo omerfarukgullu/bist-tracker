@@ -1,10 +1,13 @@
 services:
   - type: web
-    name: bist-takip
+    name: bist-tracker
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    # --timeout 120: bazı yfinance çağrıları gunicorn'un 30s varsayılanını
+    # aşabiliyor. Tam günlük analiz artık arka plan thread'inde çalışıyor
+    # (bkz. app.api_refresh), bu yüzden daha uzun bir timeout'a gerek yok.
+    startCommand: gunicorn app:app --timeout 120
     envVars:
       - key: TELEGRAM_BOT_TOKEN
         sync: false
@@ -14,7 +17,7 @@ services:
         sync: false
       - key: REFRESH_TOKEN
         sync: false
-      - key: APP_USERNAME
+      - key: SECRET_KEY
         sync: false
-      - key: APP_PASSWORD
+      - key: ANTHROPIC_API_KEY
         sync: false

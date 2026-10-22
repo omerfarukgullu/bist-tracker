@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Raporlar — BIST Takip{% endblock %}
+{% block title %}{{ t('reports_title') }} — BIST Tracker{% endblock %}
 {% block content %}
-  <h1>Geçmiş Raporlar</h1>
+  <h1>{{ t('reports_title') }}</h1>
   {% if not files %}
-    <p class="muted">Henüz rapor yok.</p>
+    <p class="muted">{{ t('no_reports') }}</p>
   {% else %}
     <ul class="report-list">
       {% for f in files %}
