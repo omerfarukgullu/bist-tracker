@@ -40,3 +40,6 @@ jobs:
           python -c "import main;       print('main ok')"
           python -c "import arge_sinyali; print('arge_sinyali ok')"
           python -c "import bot_listener; print('bot_listener ok')"
+
+
+          runs-on: ubuntu-24.04
