@@ -161,7 +161,7 @@ def _read_chart(ticker: str, chart_type: str, image_b64: str) -> Optional[str]:
         client = anthropic.Anthropic()
         response = client.messages.create(
             model="claude-opus-5",
-            max_tokens=768,
+            max_tokens=16000,  # bkz. ai_summary.py: thinking bu sınırdan düşer
             output_config={"effort": "low"},
             system=system_prompt,
             messages=[{
@@ -180,6 +180,9 @@ def _read_chart(ticker: str, chart_type: str, image_b64: str) -> Optional[str]:
         )
         if response.stop_reason == "refusal":
             print(f"[{ticker}] {meta['label']} grafik okuması reddedildi (refusal).")
+            return None
+        if response.stop_reason == "max_tokens":
+            print(f"[{ticker}] {meta['label']} grafik okuması token sınırında kesildi — yarım metin gösterilmiyor.")
             return None
         return next((b.text for b in response.content if b.type == "text"), None)
     except Exception as e:

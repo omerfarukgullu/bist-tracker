@@ -85,13 +85,21 @@ def build_summary(ticker: str, snapshot: dict, ind: dict, sentiment: dict,
         client = anthropic.Anthropic()
         response = client.messages.create(
             model="claude-opus-5",
-            max_tokens=1024,
+            # Claude Opus 5'te düşünme (thinking) varsayılan olarak açık ve
+            # düşünme token'ları max_tokens'tan düşüyor. 768/1024 gibi dar bir
+            # sınır, düşünme bütçeyi yediğinde cevabın yarıda kesilmesine ya
+            # da hiç metin dönmemesine yol açıyordu. Sınır sadece bir tavan —
+            # yalnızca gerçekten üretilen token ücretlendirilir.
+            max_tokens=16000,
             output_config={"effort": "low"},
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_content}],
         )
         if response.stop_reason == "refusal":
             print(f"[{ticker}] AI özet reddedildi (refusal).")
+            return None
+        if response.stop_reason == "max_tokens":
+            print(f"[{ticker}] AI özet token sınırında kesildi — yarım metin gösterilmiyor.")
             return None
         return next((b.text for b in response.content if b.type == "text"), None)
     except Exception as e:

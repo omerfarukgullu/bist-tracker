@@ -10,6 +10,7 @@ Kullanım:
     python bot_listener.py
 """
 
+import sys
 import time
 import requests
 
@@ -75,6 +76,9 @@ def answer_for_ticker(ticker: str, text: str) -> str:
     return _answer_for_ticker(ticker, text.lower().strip())
 
 
+_REQUIRED_SECTIONS = ("indicators", "snapshot", "sentiment", "news")
+
+
 def _answer_for_ticker(ticker: str, text_lower: str) -> str:
     cache = load_cache()
     tickers_data = cache.get("tickers", {})
@@ -82,11 +86,31 @@ def _answer_for_ticker(ticker: str, text_lower: str) -> str:
         return f"{ticker} için henüz veri yok. Önce main.py çalıştırılmış olmalı."
 
     data = tickers_data[ticker]
+    updated_at = cache.get("updated_at", "bilinmiyor")
+    incomplete = (
+        f"{ticker} için kayıtlı veri eksik ya da eski formatta — bir sonraki "
+        "tam analizde (main.py / /api/refresh) güncellenecek."
+    )
+
+    # Cache kaydına doğrudan data["indicators"] gibi erişiliyordu; eksik ya
+    # da eski formatlı bir kayıtta KeyError fırlıyor ve web paneldeki sohbet
+    # kutusu 500 dönüyordu. Önce bölümlerin varlığına bakılır; bölüm içindeki
+    # tek tek alanların eksikliği (ör. eski formatta olmayan bir anahtar ya
+    # da None üzerinde sayı formatlama) ise aşağıdaki try ile yakalanır.
+    if not isinstance(data, dict) or any(k not in data for k in _REQUIRED_SECTIONS):
+        return incomplete
+    try:
+        return _answer_from_data(ticker, data, updated_at, text_lower)
+    except (KeyError, TypeError, ValueError, IndexError) as e:
+        print(f"[{ticker}] cevap üretilemedi, cache kaydı eksik: {e!r}", file=sys.stderr)
+        return incomplete
+
+
+def _answer_from_data(ticker: str, data: dict, updated_at: str, text_lower: str) -> str:
     ind = data["indicators"]
     snapshot = data["snapshot"]
     sentiment = data["sentiment"]
     news = data["news"]
-    updated_at = cache.get("updated_at", "bilinmiyor")
 
     if "rsi" in text_lower:
         return (

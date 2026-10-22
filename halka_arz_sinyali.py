@@ -299,13 +299,16 @@ def build_ai_assessment(ticker: str, ipo_signal: dict, df: pd.DataFrame,
         client = anthropic.Anthropic()
         response = client.messages.create(
             model="claude-opus-5",
-            max_tokens=1024,
+            max_tokens=16000,  # bkz. ai_summary.py: thinking bu sınırdan düşer
             output_config={"effort": "low"},
             system=IPO_AI_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_content}],
         )
         if response.stop_reason == "refusal":
             print(f"[{ticker}] Halka arz AI değerlendirmesi reddedildi (refusal).")
+            return None
+        if response.stop_reason == "max_tokens":
+            print(f"[{ticker}] Halka arz AI değerlendirmesi token sınırında kesildi — yarım metin gösterilmiyor.")
             return None
         return next((b.text for b in response.content if b.type == "text"), None)
     except Exception as e:

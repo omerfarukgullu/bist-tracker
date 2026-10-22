@@ -8,6 +8,8 @@ denetlenebilir olsun diye kelime listesine dayalı basit bir yaklaşımdır.
 Ciddi kararlar için haberlerin kendisini mutlaka oku.
 """
 
+import re
+
 import feedparser
 import requests
 from urllib.parse import quote
@@ -18,8 +20,11 @@ from config import NEWS_LIMIT_PER_TICKER
 # İndirmeyi requests ile (timeout'lu) yapıp feedparser'a hazır metni veriyoruz.
 NEWS_FETCH_TIMEOUT = 15
 
+# "kar"/"kâr" burada YOK: düz alt-dize aramasında "karar", "kara para",
+# "kart" gibi kelimelerin içinde de eşleşiyordu. Aşağıda ayrı, ek listesi
+# sınırlı bir desenle aranıyor (bkz. _KAR_PATTERN).
 POSITIVE_WORDS = [
-    "kar", "kâr", "artış", "yükseldi", "yükseliş", "rekor", "büyüme",
+    "artış", "yükseldi", "yükseliş", "rekor", "büyüme",
     "anlaşma", "ihracat", "yeni yatırım", "temettü", "başarı", "güçlü",
     "olumlu", "iyileşme", "kazanç", "genişleme", "ödül", "onay",
 ]
@@ -31,14 +36,40 @@ NEGATIVE_WORDS = [
 ]
 
 
+# Kelimeler artık kelime BAŞINDA aranıyor (önek eşleşmesi): Türkçe eklemeli
+# olduğundan "artışı", "zararına", "onaylandı" gibi çekimler yakalanmaya devam
+# ediyor, ama bir kelimenin başka bir kelimenin ORTASINDA geçmesi artık
+# eşleşme sayılmıyor.
+def _prefix_patterns(words: list) -> list:
+    return [re.compile(r"\b" + re.escape(w)) for w in words]
+
+
+# "kâr" için ek listesi açıkça sınırlı: karı, karını, karlı, karlılık...
+# eşleşir; karar, kara, kart, kardeş eşleşmez.
+_KAR_PATTERN = re.compile(r"\bk[aâ]r(?:ı|ın|ını|ına|ında|lı|lılık|lılığı|da|dan)?\b")
+
+_POSITIVE_PATTERNS = _prefix_patterns(POSITIVE_WORDS) + [_KAR_PATTERN]
+_NEGATIVE_PATTERNS = _prefix_patterns(NEGATIVE_WORDS)
+
+
+def _tr_lower(text: str) -> str:
+    """
+    Türkçe kurallarıyla küçük harfe çevirir. Python'un str.lower()'ı "İ"yi
+    "i" + birleşik nokta (U+0307), "I"yı ise "i" yapıyor; bu yüzden büyük
+    harfli başlıklarda "İPTAL", "İFLAS", "KRİZ", "ARTIŞ", "KAYIP" gibi
+    kelimeler hiç eşleşmiyordu.
+    """
+    return text.replace("İ", "i").replace("I", "ı").lower()
+
+
 def _score_text(text: str) -> int:
-    text_lower = text.lower()
+    text_lower = _tr_lower(text)
     score = 0
-    for w in POSITIVE_WORDS:
-        if w in text_lower:
+    for pattern in _POSITIVE_PATTERNS:
+        if pattern.search(text_lower):
             score += 1
-    for w in NEGATIVE_WORDS:
-        if w in text_lower:
+    for pattern in _NEGATIVE_PATTERNS:
+        if pattern.search(text_lower):
             score -= 1
     return score
 
