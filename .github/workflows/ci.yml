@@ -1,3 +1,4 @@
+
 name: CI
 
 on:
@@ -8,7 +9,8 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
     steps:
       - uses: actions/checkout@v4
 
@@ -36,10 +38,7 @@ jobs:
         env:
           SECRET_KEY: ci-smoke-test-key
         run: |
-          python -c "import app;        print('app ok')"
-          python -c "import main;       print('main ok')"
+          python -c "import app; print('app ok')"
+          python -c "import main; print('main ok')"
           python -c "import arge_sinyali; print('arge_sinyali ok')"
           python -c "import bot_listener; print('bot_listener ok')"
-
-
-          runs-on: ubuntu-24.04
