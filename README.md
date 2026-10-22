@@ -1,8 +1,50 @@
 # BIST Tracker
 
-TRALT, SARAE, ASELS, TUPRS, EMPAE hisselerini her gün otomatik takip edip,
-teknik gösterge + haber duyarlılığı + geçmiş istatistik içeren bir Markdown
-raporu üreten script.
+> Borsa İstanbul hisseleri için günlük otomatik takip: teknik göstergeler,
+> haber duyarlılığı, istatistiksel aralık ve isteğe bağlı AI yorumu —
+> web panel, Telegram botu ve Markdown rapor arşivi ile.
+
+[![CI](https://github.com/omerfarukgullu/bist-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/omerfarukgullu/bist-tracker/actions/workflows/ci.yml)
+[![Lisans: MIT](https://img.shields.io/badge/lisans-MIT-blue.svg)](LICENSE)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](.python-version)
+
+Takip ettiğin hisseler için her gün fiyat verisini çeker, teknik göstergeleri
+hesaplar, haberleri tarar ve hepsini tek bir rapora toplar. Rapora üç yerden
+ulaşılır: **web panel**, **Telegram** ve `raporlar/` altındaki **Markdown
+arşivi**. Hisse listesi kullanıcı başınadır — her kullanıcı kendi listesini
+yönetir (bkz. "Çoklu Kullanıcı ve Hisse Listeleri").
+
+### Neler var
+
+| | |
+|---|---|
+| **Teknik göstergeler** | RSI (Wilder yumuşatması), MACD, SMA20/50 — kural tabanlı, şeffaf yorumlarla |
+| **Haber duyarlılığı** | Google News RSS taraması + Türkçe anahtar-kelime skorlaması |
+| **İstatistiksel aralık** | Monte Carlo simülasyonu ile önümüzdeki ay için %10–%90 bandı |
+| **Volatilite rejimi** | EGARCH(1,1) ile düşük/normal/yüksek sınıflandırması ve kaldıraç etkisi |
+| **Yeni halka arz** | XHARZ üyeliğine dayalı tespit + tavan/taban seri istatistikleri |
+| **AR-GE sinyali** | AR-GE yoğunluğu ve verimlilik katsayısı (ayrı, periyodik job) |
+| **AI yorumu** | Claude ile veri sentezi ve grafiklerin **görsel** olarak okunması (opsiyonel) |
+| **Web panel** | Hisse detayı, etkileşimli grafikler, hisse bazlı sohbet, TR/EN, açık/koyu tema |
+| **Telegram** | Günlük rapor gönderimi + kural tabanlı soru-cevap botu |
+
+Tüm AI özellikleri `ANTHROPIC_API_KEY` yoksa sessizce devre dışı kalır;
+geri kalan her şey eskisi gibi çalışır.
+
+## Ekran Görüntüleri
+
+Görseller henüz eklenmedi. Eklenecekleri yer `docs/images/`; hazır olduğunda
+aşağıdaki satırların yorumunu kaldırmak yeterli.
+
+<!--
+| Panel | Hisse Detayı |
+|---|---|
+| ![Panel](docs/images/panel.png) | ![Hisse detayı](docs/images/hisse-detay.png) |
+
+| Grafikler | Rapor |
+|---|---|
+| ![Grafikler](docs/images/grafikler.png) | ![Rapor](docs/images/rapor.png) |
+-->
 
 ## ÖNEMLİ — Ne yapar, ne yapmaz
 
